@@ -50,6 +50,50 @@ Shader "RayTracing"
                 float3 dir;
             };
 
+            struct HitInfo
+            {
+                bool didHit;
+                float dst;
+                float3 hitPoint;
+                float3 normal;
+            };
+
+            struct RayTracingMaterial
+            {
+                float3 colour;
+            };
+
+            struct Sphere
+            {
+                float3 position;
+                float radius;
+                RayTracingMaterial material;
+            }
+
+            HitInfo RaySphere(Ray ray, float3 sphereCenter, float sphereRadius)
+            {
+                HitInfo hitInfo = (HitInfo)0;
+                float3 offsetRayOrigin = ray.origin - sphereCenter;
+
+                float a = dot(ray.dir, ray.dir);
+                float b = 2 * dot(offsetRayOrigin, ray.dir);
+                float c = dot(offsetRayOrigin, offsetRayOrigin) - sphereRadius * sphereRadius;
+
+                float discriminant = b * b - 4 * a * c;
+
+                if (discriminant >= 0) {
+                    float dst = (-b - sqrt(discriminant)) / (2 * a);
+
+                    if (dst >= 0) {
+                        hitInfo.didHit = true;
+                        hitInfo.dst = dst;
+                        hitInfo.hitPoint = ray.origin + ray.dir * dst;
+                        hitInfo.normal = normalize(hitInfo.hitPoint - sphereCenter);
+                    }
+                }
+                return hitInfo;
+            }
+
             float4 frag (v2f i) : SV_Target
             {
                 float3 viewPointLocal = float3(i.uv - 0.5, 1) * viewParams;
@@ -58,7 +102,7 @@ Shader "RayTracing"
                 Ray ray;
                 ray.origin = _WorldSpaceCameraPos;
                 ray.dir = normalize(viewPoint - ray.origin);
-                return float4(ray.dir, 0);
+                return RaySphere(ray, 0, 1).didHit ? float4(ray.dir, 0) : float4(0,0,0,0);
             }
             ENDCG
         }
