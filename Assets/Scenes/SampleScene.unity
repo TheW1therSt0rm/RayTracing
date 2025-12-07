@@ -269,15 +269,12 @@ MonoBehaviour:
   m_GameObject: {fileID: 330585543}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fb2318368497a06449eb0c923ff3ac0c, type: 3}
+  m_Script: {fileID: 11500000, guid: 146423e73ba52704c839e1222c132aa0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  cam: {fileID: 330585545}
-  cols: 50
-  rows: 20
-  depth: 4
-  pointSize: 0.075
-  colour: {r: 1, g: 1, b: 1, a: 1}
+  useShaderInSceneView: 1
+  rayTracingShader: {fileID: 4800000, guid: 8fe43b64d47062749920745b84ed9b54, type: 3}
+  rayTracingMaterial: {fileID: 2100000, guid: b7ed796295128324aabc09eab3fc693b, type: 2}
 --- !u!1 &410087039
 GameObject:
   m_ObjectHideFlags: 0
