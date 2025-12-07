@@ -9,8 +9,12 @@ public class CamTest : MonoBehaviour
     public Camera cam;      // Assign your camera here (or it will auto-grab)
     public int cols = 10;   // How many points across
     public int rows = 6;    // How many points down
-    public float depth = 5f;   // Distance in front of the camera
-    public float pointSize = 0.05f; // Gizmo sphere size
+    public float depth = 5f;      // Distance in front of the camera
+    public float pointSize = 0.05f;
+    public Color colour = Color.white;
+
+    // This gets filled in Update and read in OnDrawGizmos
+    private List<Vector3> gridPoints = new List<Vector3>();
 
     void OnValidate()
     {
@@ -28,7 +32,7 @@ public class CamTest : MonoBehaviour
         if (cam == null) cam = GetComponent<Camera>();
         if (cam == null) return;
 
-        Gizmos.color = Color.cyan;
+        gridPoints.Clear();
 
         // Loop over a grid in *screen space* (0..Screen.width, 0..Screen.height)
         for (int y = 0; y < rows; y++)
@@ -47,8 +51,21 @@ public class CamTest : MonoBehaviour
                 // Convert to world position
                 Vector3 worldPos = cam.ScreenToWorldPoint(screenPos);
 
-                Gizmos.DrawSphere(worldPos, pointSize);
+                gridPoints.Add(worldPos);
             }
+        }
+    }
+
+    void OnDrawGizmos()
+    {
+        if (gridPoints == null || gridPoints.Count == 0)
+            return;
+
+        Gizmos.color = colour;
+
+        foreach (var p in gridPoints)
+        {
+            Gizmos.DrawSphere(p, pointSize);
         }
     }
 }
