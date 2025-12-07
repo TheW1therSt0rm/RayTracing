@@ -66,6 +66,7 @@ public class CamTest : MonoBehaviour
         foreach (var p in gridPoints)
         {
             Gizmos.DrawSphere(p, pointSize);
+            Gizmos.DrawRay(cam.transform.position, (p - cam.transform.position).normalized * depth);
         }
     }
 }
