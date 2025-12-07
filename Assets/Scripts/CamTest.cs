@@ -46,7 +46,7 @@ public class CamTest : MonoBehaviour
                 float screenX = u * cam.pixelWidth;
 
                 // Build screen position (x, y, depth from camera)
-                Vector3 screenPos = new Vector3(screenX, screenY, depth);
+                Vector3 screenPos = new(screenX, screenY, depth);
 
                 // Convert to world position
                 Vector3 worldPos = cam.ScreenToWorldPoint(screenPos);
