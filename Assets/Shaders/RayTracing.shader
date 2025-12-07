@@ -68,7 +68,7 @@ Shader "RayTracing"
                 float3 position;
                 float radius;
                 RayTracingMaterial material;
-            }
+            };
 
             HitInfo RaySphere(Ray ray, float3 sphereCenter, float sphereRadius)
             {
