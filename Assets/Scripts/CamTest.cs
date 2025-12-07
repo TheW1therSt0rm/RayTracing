@@ -2,17 +2,53 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
+[ExecuteAlways] // so it also runs in Edit mode
+[RequireComponent(typeof(Camera))]
 public class CamTest : MonoBehaviour
 {
-    // Start is called before the first frame update
-    void Start()
-    { 
-        
+    public Camera cam;      // Assign your camera here (or it will auto-grab)
+    public int cols = 10;   // How many points across
+    public int rows = 6;    // How many points down
+    public float depth = 5f;   // Distance in front of the camera
+    public float pointSize = 0.05f; // Gizmo sphere size
+
+    void OnValidate()
+    {
+        cols = Mathf.Max(2, cols);
+        rows = Mathf.Max(2, rows);
     }
 
-    // Update is called once per frame
+    void Reset()
+    {
+        cam = GetComponent<Camera>();
+    }
+
     void Update()
     {
-        
+        if (cam == null) cam = GetComponent<Camera>();
+        if (cam == null) return;
+
+        Gizmos.color = Color.cyan;
+
+        // Loop over a grid in *screen space* (0..Screen.width, 0..Screen.height)
+        for (int y = 0; y < rows; y++)
+        {
+            float v = (float)y / (rows - 1); // 0..1
+            float screenY = v * cam.pixelHeight;
+
+            for (int x = 0; x < cols; x++)
+            {
+                float u = (float)x / (cols - 1); // 0..1
+                float screenX = u * cam.pixelWidth;
+
+                // Build screen position (x, y, depth from camera)
+                Vector3 screenPos = new Vector3(screenX, screenY, depth);
+
+                // Convert to world position
+                Vector3 worldPos = cam.ScreenToWorldPoint(screenPos);
+
+                Gizmos.DrawSphere(worldPos, pointSize);
+            }
+        }
     }
 }
