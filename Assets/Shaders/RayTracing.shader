@@ -12,6 +12,8 @@ Shader "RayTracing"
         Pass
         {
             CGPROGRAM
+            #pragma target 3.0
+
             #pragma vertex vert
             #pragma fragment frag
             // make fog work
@@ -70,6 +72,32 @@ Shader "RayTracing"
                 float radius;
                 RayTracingMaterial material;
             };
+
+            float RaySphereDist(Ray ray, float3 sphereCenter, float sphereRadius)
+            {
+                float3 oc = ray.origin - sphereCenter;
+
+                float a = dot(ray.dir, ray.dir);
+                float b = 2.0 * dot(oc, ray.dir);
+                float c = dot(oc, oc) - sphereRadius * sphereRadius;
+
+                float discriminant = b * b - 4.0 * a * c;
+
+                if (discriminant < 0.0)
+                    return -1.0;
+
+                float sqrtD = sqrt(discriminant);
+
+                float t0 = (-b - sqrtD) / (2.0 * a);
+                float t1 = (-b + sqrtD) / (2.0 * a);
+
+                // pick the smallest positive t
+                float t = t0;
+                if (t < 0.0) t = t1;
+                if (t < 0.0) return -1.0;
+
+                return t;
+            }
 
             HitInfo RaySphere(Ray ray, float3 sphereCenter, float sphereRadius)
             {
@@ -142,21 +170,40 @@ Shader "RayTracing"
 
             float4 frag (v2f i) : SV_Target
             {
-                float3 viewPointLocal = float3(i.uv - 0.5, 1) * viewParams;
-                float3 viewPoint = mul(CamLocalToWorldMatrix, float4(viewPointLocal, 1)).xyz;
+                // Camera position & basis from matrix
+                float3 camPos     = mul(CamLocalToWorldMatrix, float4(0, 0, 0, 1)).xyz;
+                float3 camForward = normalize(mul(CamLocalToWorldMatrix, float4(0, 0, 1, 0)).xyz);
+                float3 camRight   = normalize(mul(CamLocalToWorldMatrix, float4(1, 0, 0, 0)).xyz);
+                float3 camUp      = normalize(mul(CamLocalToWorldMatrix, float4(0, 1, 0, 0)).xyz);
+
+                // NDC coordinates in [-1, 1]
+                float2 ndc = i.uv * 2.0 - 1.0;
+
+                // viewParams.x = tan(fov/2)*aspect
+                // viewParams.y = tan(fov/2)
+                float3 dirCamera = normalize(float3(ndc.x * viewParams.x, ndc.y * viewParams.y, 1.0));
+
+                // Transform camera-space ray direction into world space
+                float3 dirWorld =
+                    dirCamera.x * camRight +
+                    dirCamera.y * camUp +
+                    dirCamera.z * camForward;
+                dirWorld = normalize(dirWorld);
 
                 Ray ray;
-                ray.origin = _WorldSpaceCameraPos;
-                ray.dir = normalize(viewPoint - ray.origin);
-                
+                ray.origin = camPos;
+                ray.dir    = dirWorld;
+
                 HitInfo hitInfo = CalculateRayCollision(ray);
-                                
+
                 if (!hitInfo.didHit)
                 {
-                    return float4(ray.dir, 0);
+                    // Miss: show a nice debug background so you still see rays
+                    return float4(0, 0, 0, 1.0);
                 }
 
-                return float4(hitInfo.material.colour, 0);
+                // Hit: show sphere colour
+                return float4(hitInfo.material.colour, 1.0);
             }
             ENDCG
         }

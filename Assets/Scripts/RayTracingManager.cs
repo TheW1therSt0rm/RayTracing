@@ -50,16 +50,18 @@ public class RayTracingManager : MonoBehaviour
 
     void UpdateCameraParams(Camera cam)
     {
-        // Ray generation params
-        float planeHeight = cam.nearClipPlane * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * 2f;
-        float planeWidth  = planeHeight * cam.aspect;
+        // Ray generation params based on FOV
+        float halfHeight = Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+        float halfWidth  = halfHeight * cam.aspect;
 
-        rayTracingMaterial.SetVector(ViewParamsID, new Vector3(planeWidth, planeHeight, cam.nearClipPlane));
+        rayTracingMaterial.SetVector(ViewParamsID, new Vector3(halfWidth, halfHeight, 0.0f));
         rayTracingMaterial.SetMatrix(CamLocalToWorldID, cam.transform.localToWorldMatrix);
 
         // Gather spheres from the scene
         SphereObject[] sphereObjects = FindObjectsOfType<SphereObject>();
         int count = Mathf.Min(sphereObjects.Length, MAX_SPHERES);
+
+        Debug.Log($"[RayTracing] Found {count} spheres");
 
         // Allocate arrays for GPU upload
         var positions = new Vector4[count];

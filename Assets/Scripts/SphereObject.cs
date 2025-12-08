@@ -16,6 +16,7 @@ public class SphereObject : MonoBehaviour
 {
     public Sphere sphere;
     public Color colour = Color.white;
+    public float radius = 1.0f;
 
     void Start()
     {
@@ -28,11 +29,13 @@ public class SphereObject : MonoBehaviour
     {
         sphere.position = transform.position;
         sphere.material.colour = colour;
+        sphere.radius = radius;
     }
 
     void Update()
     {
         sphere.position = transform.position;
         sphere.material.colour = colour;
+        sphere.radius = radius;
     }
 }
