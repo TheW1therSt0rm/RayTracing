@@ -17,6 +17,13 @@ public class SphereObject : MonoBehaviour
     public Sphere sphere;
     public Color colour = Color.white;
 
+    void Start()
+    {
+        sphere.position = transform.position;
+        sphere.material.colour = colour;
+        sphere.radius = 1.0f;
+    }
+
     void OnValidate()
     {
         sphere.position = transform.position;

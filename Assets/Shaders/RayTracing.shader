@@ -95,7 +95,9 @@ Shader "RayTracing"
                 return hitInfo;
             }
 
-            StructuredBuffer<Sphere> Spheres;
+            StructuredBuffer<float3> SphereCols;
+            StructuredBuffer<float3> SpherePositions;
+            StructuredBuffer<float> SphereRadiuses;
             int NumSpheres;
 
             HitInfo CalculateRayCollision(Ray ray)
@@ -105,8 +107,15 @@ Shader "RayTracing"
 
                 for (int i = 0; i < NumSpheres; i++)
                 {
-                    Sphere sphere = Spheres[i];
-                    HitInfo hitInfo = RaySphere(ray, sphere.position, sphere.radius);
+                    float3 col = SphereCols[i];
+                    RayTracingMaterial material;
+                    material.colour = col;
+                    float3 pos = SpherePositions[i];
+                    float radius = SphereRadiuses[i];
+                    Sphere sphere;
+                    sphere.position = pos;
+                    sphere.radius = radius;
+                    sphere.material = material;
                     
                     if (hitInfo.didHit && hitInfo.dst < closestHit.dst)
                     {

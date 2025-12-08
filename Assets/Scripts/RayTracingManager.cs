@@ -70,14 +70,13 @@ public class RayTracingManager : MonoBehaviour
             };
 
             // position (pad to Vector4 is fine)
-            rayTracingMaterial.SetVector($"spheres[{i}].position",
+            rayTracingMaterial.SetVector($"SpherePositions[{i}]",
                 new Vector4(s.position.x, s.position.y, s.position.z, 1));
 
             // radius
-            rayTracingMaterial.SetFloat($"spheres[{i}].radius", s.radius);
-
+            rayTracingMaterial.SetFloat($"SphereRadiuses[{i}]", s.radius);
             // colour
-            rayTracingMaterial.SetColor($"spheres[{i}].material.colour", new Color(s.material.colour.x, s.material.colour.y, s.material.colour.z));
+            rayTracingMaterial.SetColor($"SphereCols[{i}]", new Color(s.material.colour.x, s.material.colour.y, s.material.colour.z));
         }
     }
 }
