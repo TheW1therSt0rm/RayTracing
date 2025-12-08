@@ -36,5 +36,13 @@ public class RayTracingManager : MonoBehaviour
 
         rayTracingMaterial.SetVector("viewParams", new Vector3(planeWidth, planeHeight, cam.nearClipPlane));
         rayTracingMaterial.SetMatrix("CamLocalToWorldMatrix", cam.transform.localToWorldMatrix);
+
+        for (int i = 0; i < FindObjectsOfType<SphereObject>().Length; i++)
+        {
+            SphereObject sphereObject = FindObjectsOfType<SphereObject>()[i];
+            rayTracingMaterial.SetVector($"spheres[{i}].position", sphereObject.sphere.position);
+            rayTracingMaterial.SetFloat($"spheres[{i}].radius", sphereObject.sphere.radius);
+            rayTracingMaterial.SetVector($"spheres[{i}].material.colour", new Vector3(sphereObject.sphere.material.colour.r, sphereObject.sphere.material.colour.g, sphereObject.sphere.material.colour.b));
+        }
     }
 }
