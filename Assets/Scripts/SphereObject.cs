@@ -12,8 +12,7 @@ public struct Sphere
     public RayTracingMaterial material;
 }
 
-[System.Serializable]
 public class SphereObject : MonoBehaviour
 {
-    public Sphere sphere;
+    [SerializeField] Sphere sphere;
 }
