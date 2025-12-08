@@ -454,6 +454,7 @@ GameObject:
   - component: {fileID: 1053477206}
   - component: {fileID: 1053477205}
   - component: {fileID: 1053477204}
+  - component: {fileID: 1053477208}
   m_Layer: 0
   m_Name: Sphere (1)
   m_TagString: Untagged
@@ -547,6 +548,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1053477208
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1053477203}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2002da53d506d043982ab3f2718176c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  colour: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &1341986092
 GameObject:
   m_ObjectHideFlags: 0
@@ -559,6 +573,7 @@ GameObject:
   - component: {fileID: 1341986095}
   - component: {fileID: 1341986094}
   - component: {fileID: 1341986093}
+  - component: {fileID: 1341986097}
   m_Layer: 0
   m_Name: Sphere
   m_TagString: Untagged
@@ -652,6 +667,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1341986097
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1341986092}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2002da53d506d043982ab3f2718176c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  colour: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &1490675064
 GameObject:
   m_ObjectHideFlags: 0
@@ -664,6 +692,7 @@ GameObject:
   - component: {fileID: 1490675067}
   - component: {fileID: 1490675066}
   - component: {fileID: 1490675065}
+  - component: {fileID: 1490675069}
   m_Layer: 0
   m_Name: Sphere (2)
   m_TagString: Untagged
@@ -757,6 +786,19 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1490675069
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1490675064}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b2002da53d506d043982ab3f2718176c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  colour: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
