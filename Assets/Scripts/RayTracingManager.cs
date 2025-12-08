@@ -29,20 +29,55 @@ public class RayTracingManager : MonoBehaviour
         }
     }
 
+    struct RayTracingMaterial
+    {
+        public Vector3 colour;
+    }
+
+    struct Sphere
+    {
+        public Vector3 position;
+        public float radius;
+        public RayTracingMaterial material;
+    }
+
     void UpdateCameraParams(Camera cam)
     {
         float planeHeight = cam.nearClipPlane * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * 2f;
-        float planeWidth = planeHeight * cam.aspect;
+        float planeWidth  = planeHeight * cam.aspect;
 
         rayTracingMaterial.SetVector("viewParams", new Vector3(planeWidth, planeHeight, cam.nearClipPlane));
         rayTracingMaterial.SetMatrix("CamLocalToWorldMatrix", cam.transform.localToWorldMatrix);
 
-        for (int i = 0; i < FindObjectsOfType<SphereObject>().Length; i++)
+        SphereObject[] sphereObjects = FindObjectsOfType<SphereObject>();
+        int count = Mathf.Min(sphereObjects.Length, 64); // match MAX_SPHERES
+
+        rayTracingMaterial.SetInt("NumSpheres", count);
+
+        for (int i = 0; i < count; i++)
         {
-            SphereObject sphereObject = FindObjectsOfType<SphereObject>()[i];
-            rayTracingMaterial.SetVector($"spheres[{i}].position", sphereObject.sphere.position);
-            rayTracingMaterial.SetFloat($"spheres[{i}].radius", sphereObject.sphere.radius);
-            rayTracingMaterial.SetVector($"spheres[{i}].material.colour", new Vector3(sphereObject.sphere.material.colour.r, sphereObject.sphere.material.colour.g, sphereObject.sphere.material.colour.b));
+            SphereObject sp = sphereObjects[i];
+            Sphere s = new()
+            {
+                position = sp.sphere.position,
+                radius = sp.sphere.radius,
+                material = new RayTracingMaterial()
+                {
+                    colour = new Vector3(sp.sphere.material.colour.r,
+                                         sp.sphere.material.colour.g,
+                                         sp.sphere.material.colour.b)
+                }
+            };
+
+            // position (pad to Vector4 is fine)
+            rayTracingMaterial.SetVector($"spheres[{i}].position",
+                new Vector4(s.position.x, s.position.y, s.position.z, 1));
+
+            // radius
+            rayTracingMaterial.SetFloat($"spheres[{i}].radius", s.radius);
+
+            // colour
+            rayTracingMaterial.SetColor($"spheres[{i}].material.colour", new Color(s.material.colour.x, s.material.colour.y, s.material.colour.z));
         }
     }
 }
