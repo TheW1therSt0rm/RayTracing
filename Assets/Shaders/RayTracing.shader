@@ -95,10 +95,10 @@ Shader "RayTracing"
                 return hitInfo;
             }
 
-            StructuredBuffer<float3> SphereCols;
-            StructuredBuffer<float3> SpherePositions;
-            StructuredBuffer<float> SphereRadiuses;
-            int NumSpheres;
+            float3 SphereCols[64];
+            float3 SpherePositions[64];
+            float  SphereRadiuses[64];
+            int    NumSpheres;
 
             HitInfo CalculateRayCollision(Ray ray)
             {
