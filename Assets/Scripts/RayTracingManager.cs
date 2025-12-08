@@ -3,15 +3,34 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [ExecuteAlways, ImageEffectAllowedInSceneView]
+[RequireComponent(typeof(Camera))]
 public class RayTracingManager : MonoBehaviour
 {
-    [SerializeField] bool useShaderInSceneView;
+    const int MAX_SPHERES = 64;
+
+    [SerializeField] bool useShaderInSceneView = true;
     [SerializeField] Shader rayTracingShader;
     public Material rayTracingMaterial;
 
+    static readonly int ViewParamsID      = Shader.PropertyToID("viewParams");
+    static readonly int CamLocalToWorldID = Shader.PropertyToID("CamLocalToWorldMatrix");
+    static readonly int NumSpheresID      = Shader.PropertyToID("NumSpheres");
+    static readonly int SpherePositionsID = Shader.PropertyToID("SpherePositions");
+    static readonly int SphereColsID      = Shader.PropertyToID("SphereCols");
+    static readonly int SphereRadiusesID  = Shader.PropertyToID("SphereRadiuses");
+
     void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
-        if (Camera.current.name != "SceneCamera" || useShaderInSceneView) {
+        var cam = GetComponent<Camera>();
+        if (cam == null)
+        {
+            Graphics.Blit(source, destination);
+            return;
+        }
+
+        // Only run in game view unless toggled
+        if (Camera.current.name != "SceneCamera" || useShaderInSceneView)
+        {
             if (rayTracingMaterial == null)
             {
                 rayTracingMaterial = new Material(rayTracingShader)
@@ -20,63 +39,52 @@ public class RayTracingManager : MonoBehaviour
                 };
             }
 
-            UpdateCameraParams(Camera.current);
-
+            UpdateCameraParams(cam);
             Graphics.Blit(null, destination, rayTracingMaterial);
         }
-        else {
+        else
+        {
             Graphics.Blit(source, destination);
         }
     }
 
-    struct RayTracingMaterial
-    {
-        public Vector3 colour;
-    }
-
-    struct Sphere
-    {
-        public Vector3 position;
-        public float radius;
-        public RayTracingMaterial material;
-    }
-
     void UpdateCameraParams(Camera cam)
     {
+        // Ray generation params
         float planeHeight = cam.nearClipPlane * Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad) * 2f;
         float planeWidth  = planeHeight * cam.aspect;
 
-        rayTracingMaterial.SetVector("viewParams", new Vector3(planeWidth, planeHeight, cam.nearClipPlane));
-        rayTracingMaterial.SetMatrix("CamLocalToWorldMatrix", cam.transform.localToWorldMatrix);
+        rayTracingMaterial.SetVector(ViewParamsID, new Vector3(planeWidth, planeHeight, cam.nearClipPlane));
+        rayTracingMaterial.SetMatrix(CamLocalToWorldID, cam.transform.localToWorldMatrix);
 
+        // Gather spheres from the scene
         SphereObject[] sphereObjects = FindObjectsOfType<SphereObject>();
-        int count = Mathf.Min(sphereObjects.Length, 64); // match MAX_SPHERES
+        int count = Mathf.Min(sphereObjects.Length, MAX_SPHERES);
 
-        rayTracingMaterial.SetInt("NumSpheres", count);
+        // Allocate arrays for GPU upload
+        var positions = new Vector4[count];
+        var colours   = new Vector4[count];
+        var radiuses  = new float[count];
 
         for (int i = 0; i < count; i++)
         {
             SphereObject sp = sphereObjects[i];
-            Sphere s = new()
-            {
-                position = sp.sphere.position,
-                radius = sp.sphere.radius,
-                material = new RayTracingMaterial()
-                {
-                    colour = new Vector3(sp.sphere.material.colour.r,
-                                         sp.sphere.material.colour.g,
-                                         sp.sphere.material.colour.b)
-                }
-            };
 
-            // position (pad to Vector4 is fine)
-            rayTracingMaterial.SetVector($"SpherePositions[{i}]",
-                new Vector4(s.position.x, s.position.y, s.position.z, 1));
+            // make sure SphereObject has updated its sphere
+            var s = sp.sphere;
 
-            // radius
-            rayTracingMaterial.SetFloat($"SphereRadiuses[{i}]", s.radius);
-            // colour
-            rayTracingMaterial.SetColor($"SphereCols[{i}]", new Color(s.material.colour.x, s.material.colour.y, s.material.colour.z));
+            Vector3 pos = s.position;
+            float radius = s.radius;
+            Color col = s.material.colour;
+
+            positions[i] = new Vector4(pos.x, pos.y, pos.z, 1.0f);
+            colours[i]   = new Vector4(col.r, col.g, col.b, 1.0f);
+            radiuses[i]  = radius;
         }
+
+        rayTracingMaterial.SetInt(NumSpheresID, count);
+        rayTracingMaterial.SetVectorArray(SpherePositionsID, positions);
+        rayTracingMaterial.SetVectorArray(SphereColsID,      colours);
+        rayTracingMaterial.SetFloatArray(SphereRadiusesID,   radiuses);
     }
 }

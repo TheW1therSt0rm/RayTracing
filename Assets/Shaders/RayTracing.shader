@@ -74,24 +74,35 @@ Shader "RayTracing"
             HitInfo RaySphere(Ray ray, float3 sphereCenter, float sphereRadius)
             {
                 HitInfo hitInfo = (HitInfo)0;
+
                 float3 offsetRayOrigin = ray.origin - sphereCenter;
 
                 float a = dot(ray.dir, ray.dir);
-                float b = 2 * dot(offsetRayOrigin, ray.dir);
+                float b = 2.0 * dot(offsetRayOrigin, ray.dir);
                 float c = dot(offsetRayOrigin, offsetRayOrigin) - sphereRadius * sphereRadius;
 
-                float discriminant = b * b - 4 * a * c;
+                float discriminant = b * b - 4.0 * a * c;
 
-                if (discriminant >= 0) {
-                    float dst = (-b - sqrt(discriminant)) / (2 * a);
+                if (discriminant < 0.0)
+                    return hitInfo; // didHit stays false
 
-                    if (dst >= 0) {
-                        hitInfo.didHit = true;
-                        hitInfo.dst = dst;
-                        hitInfo.hitPoint = ray.origin + ray.dir * dst;
-                        hitInfo.normal = normalize(hitInfo.hitPoint - sphereCenter);
-                    }
-                }
+                float sqrtD = sqrt(discriminant);
+
+                // closer root
+                float t = (-b - sqrtD) / (2.0 * a);
+
+                // if behind camera, try the other root
+                if (t < 0.0)
+                    t = (-b + sqrtD) / (2.0 * a);
+
+                if (t < 0.0)
+                    return hitInfo;
+
+                hitInfo.didHit   = true;
+                hitInfo.dst      = t;
+                hitInfo.hitPoint = ray.origin + ray.dir * t;
+                hitInfo.normal   = normalize(hitInfo.hitPoint - sphereCenter);
+
                 return hitInfo;
             }
 
@@ -103,7 +114,8 @@ Shader "RayTracing"
             HitInfo CalculateRayCollision(Ray ray)
             {
                 HitInfo closestHit = (HitInfo)0;
-                closestHit.dst = 1.#INF;
+                closestHit.didHit = false;
+                closestHit.dst = 1e20;
 
                 for (int i = 0; i < NumSpheres; i++)
                 {
@@ -136,7 +148,15 @@ Shader "RayTracing"
                 Ray ray;
                 ray.origin = _WorldSpaceCameraPos;
                 ray.dir = normalize(viewPoint - ray.origin);
-                return float4(CalculateRayCollision(ray).material.colour, 0);
+                
+                HitInfo hitInfo = CalculateRayCollision(ray);
+                                
+                if (!hitInfo.didHit)
+                {
+                    return float4(ray.dir, 0);
+                }
+
+                return float4(hitInfo.material.colour, 0);
             }
             ENDCG
         }
