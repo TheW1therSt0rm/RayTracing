@@ -50,17 +50,18 @@ Shader "RayTracing"
                 float3 dir;
             };
 
+            struct RayTracingMaterial
+            {
+                float3 colour;
+            };
+
             struct HitInfo
             {
                 bool didHit;
                 float dst;
                 float3 hitPoint;
                 float3 normal;
-            };
-
-            struct RayTracingMaterial
-            {
-                float3 colour;
+                RayTracingMaterial material;
             };
 
             struct Sphere
@@ -94,6 +95,28 @@ Shader "RayTracing"
                 return hitInfo;
             }
 
+            StructuredBuffer<Sphere> Spheres;
+            int NumSpheres;
+
+            HitInfo CalculateRayCollision(Ray ray)
+            {
+                HitInfo closestHit = (HitInfo)0;
+                closestHit.dst = 1.#INF;
+
+                for (int i = 0; i < NumSpheres; i++)
+                {
+                    Sphere sphere = Spheres[i];
+                    HitInfo hitInfo = RaySphere(ray, sphere.position, sphere.radius);
+                    
+                    if (hitInfo.didHit && hitInfo.dst < closestHit.dst)
+                    {
+                        closestHit = hitInfo;
+                        closestHit.material = sphere.material;
+                    }
+                }
+                return closestHit;
+            }
+
             float4 frag (v2f i) : SV_Target
             {
                 float3 viewPointLocal = float3(i.uv - 0.5, 1) * viewParams;
@@ -102,7 +125,7 @@ Shader "RayTracing"
                 Ray ray;
                 ray.origin = _WorldSpaceCameraPos;
                 ray.dir = normalize(viewPoint - ray.origin);
-                return RaySphere(ray, 0, 1).didHit ? float4(ray.dir, 0) : float4(0,0,0,0);
+                return float4(CalculateRayCollision(ray).material.colour, 0);
             }
             ENDCG
         }
