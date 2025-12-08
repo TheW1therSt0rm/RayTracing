@@ -116,6 +116,8 @@ Shader "RayTracing"
                     sphere.position = pos;
                     sphere.radius = radius;
                     sphere.material = material;
+
+                    HitInfo hitInfo = RaySphere(ray, sphere.position, sphere.radius);
                     
                     if (hitInfo.didHit && hitInfo.dst < closestHit.dst)
                     {
