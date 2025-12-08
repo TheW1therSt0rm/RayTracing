@@ -14,5 +14,5 @@ public struct Sphere
 
 public class SphereObject : MonoBehaviour
 {
-    [SerializeField] Sphere sphere;
+    public Sphere sphere;
 }
