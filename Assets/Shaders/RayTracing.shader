@@ -223,24 +223,21 @@ Shader "RayTracing"
                 for (int i = 0; i < MaxBounces + 1; i++)
                 {
                     HitInfo hitInfo = CalculateRayCollision(ray);
-                    if (!hitInfo.didHit)
+                    if (hitInfo.didHit)
                     {
-                        incomingLight += rayColour * GetEnvironmentColour(ray);
+                        ray.origin = hitInfo.hitPoint;
+                        ray.dir = RandomHemisphereDirection(hitInfo.normal, state);
+
+                        RayTracingMaterial material = hitInfo.material;
+                        float3 emittedLight = material.emission * material.emissionStrength;
+                        incomingLight += emittedLight * rayColour;
+                        rayColour *= material.colour;
+                    }
+                    else
+                    {
+                        incomingLight += GetEnvironmentColour(ray) * rayColour;
                         break;
                     }
-
-                    RayTracingMaterial mat = hitInfo.material;
-
-                    float3 emission = mat.emission * mat.emissionStrength;
-                    incomingLight += rayColour * emission;
-
-                    float3 newDir = RandomHemisphereDirection(hitInfo.normal, state);
-                    float  cosTheta = max(0, dot(newDir, hitInfo.normal));
-
-                    rayColour *= mat.colour * cosTheta;
-
-                    ray.origin = hitInfo.hitPoint + hitInfo.normal * 0.001;
-                    ray.dir    = newDir;
                 }
 
                 return incomingLight;
@@ -270,13 +267,14 @@ Shader "RayTracing"
 
                 // Seed for RNG (slightly less cursed)
                 uint state = asuint(i.uv.x * 1234.567) ^ asuint(i.uv.y * 3456.789);
+                
+                Ray ray;
+                ray.origin = camPos;
+                ray.dir    = dirWorld;
 
                 float3 col = 0;
                 for (int i = 0; i < raysPerPixel; i++)
                 {
-                    Ray ray;
-                    ray.origin = camPos;
-                    ray.dir    = dirWorld;
                     col += Trace(ray, state);
                 }
                 col /= raysPerPixel;

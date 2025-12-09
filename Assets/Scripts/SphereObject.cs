@@ -29,6 +29,15 @@ public class SphereObject : MonoBehaviour
         sphere.radius = 1.0f;
     }
 
+    void OnRenderImage(RenderTexture source, RenderTexture destination)
+    {
+        sphere.position = transform.position;
+        sphere.material.colour = colour;
+        sphere.material.emission = emission;
+        sphere.material.emissionStrength = emissionStrength;
+        sphere.radius = transform.localScale.x * 0.5f;
+    }
+
     void OnValidate()
     {
         sphere.position = transform.position;
