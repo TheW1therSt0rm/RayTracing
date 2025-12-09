@@ -10,6 +10,10 @@ public class RayTracingManager : MonoBehaviour
 
     [SerializeField] bool useShaderInSceneView = true;
     [SerializeField] Shader rayTracingShader;
+    [SerializeField, Range(1, 30)]
+    int maxBounces = 5;
+    [SerializeField, Range(1, 200)]
+    int raysPerPixel = 3;
     public Material rayTracingMaterial;
 
     static readonly int ViewParamsID      = Shader.PropertyToID("viewParams");
@@ -17,7 +21,11 @@ public class RayTracingManager : MonoBehaviour
     static readonly int NumSpheresID      = Shader.PropertyToID("NumSpheres");
     static readonly int SpherePositionsID = Shader.PropertyToID("SpherePositions");
     static readonly int SphereColsID      = Shader.PropertyToID("SphereCols");
+    static readonly int SphereEmissionsID = Shader.PropertyToID("SphereEmissions");
+    static readonly int SphereEmissionStrengthsID = Shader.PropertyToID("SphereEmissionStrengths");
     static readonly int SphereRadiusesID  = Shader.PropertyToID("SphereRadiuses");
+    static readonly int MaxBouncesID     = Shader.PropertyToID("MaxBounces");
+    static readonly int RaysPerPixelID   = Shader.PropertyToID("raysPerPixel");
 
     void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
@@ -66,6 +74,8 @@ public class RayTracingManager : MonoBehaviour
         // Allocate arrays for GPU upload
         var positions = new Vector4[count];
         var colours   = new Vector4[count];
+        var emissions = new Vector4[count];
+        var emissionStrengths = new float[count];
         var radiuses  = new float[count];
 
         for (int i = 0; i < count; i++)
@@ -78,15 +88,23 @@ public class RayTracingManager : MonoBehaviour
             Vector3 pos = s.position;
             float radius = s.radius;
             Color col = s.material.colour;
+            Color emission = s.material.emission;
+            float emissionStrength = s.material.emissionStrength;
 
             positions[i] = new Vector4(pos.x, pos.y, pos.z, 1.0f);
             colours[i]   = new Vector4(col.r, col.g, col.b, 1.0f);
+            emissions[i] = new Vector4(emission.r, emission.g, emission.b, 1.0f);
+            emissionStrengths[i] = emissionStrength;
             radiuses[i]  = radius;
         }
 
         rayTracingMaterial.SetInt(NumSpheresID, count);
         rayTracingMaterial.SetVectorArray(SpherePositionsID, positions);
         rayTracingMaterial.SetVectorArray(SphereColsID,      colours);
+        rayTracingMaterial.SetVectorArray(SphereEmissionsID, emissions);
+        rayTracingMaterial.SetFloatArray(SphereEmissionStrengthsID, emissionStrengths);
         rayTracingMaterial.SetFloatArray(SphereRadiusesID,   radiuses);
+        rayTracingMaterial.SetInt(MaxBouncesID, maxBounces);
+        rayTracingMaterial.SetInt(RaysPerPixelID, raysPerPixel);
     }
 }
