@@ -272,8 +272,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 146423e73ba52704c839e1222c132aa0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  useShaderInSceneView: 0
+  useShaderInSceneView: 1
   rayTracingShader: {fileID: 4800000, guid: 8fe43b64d47062749920745b84ed9b54, type: 3}
+  maxBounces: 30
+  raysPerPixel: 200
   rayTracingMaterial: {fileID: 2100000, guid: b7ed796295128324aabc09eab3fc693b, type: 2}
 --- !u!1 &410087039
 GameObject:
@@ -614,7 +616,7 @@ Transform:
   m_GameObject: {fileID: 1053477203}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.06, y: 2.24, z: 9.7}
+  m_LocalPosition: {x: 0.06, y: 3.26, z: 9.7}
   m_LocalScale: {x: 15.369919, y: 15.369919, z: 15.369919}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -736,7 +738,7 @@ Transform:
   m_GameObject: {fileID: 1341986092}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -13.84, y: -3.43, z: 11.77}
+  m_LocalPosition: {x: -15.89, y: -1.81, z: 3.42}
   m_LocalScale: {x: 2.096, y: 2.096, z: 2.096}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -858,7 +860,7 @@ Transform:
   m_GameObject: {fileID: 1490675064}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 17, y: -5.31, z: 5.5}
+  m_LocalPosition: {x: 0.56, y: -3.21, z: -6.07}
   m_LocalScale: {x: 3.6603642, y: 3.6603642, z: 3.6603642}
   m_ConstrainProportionsScale: 0
   m_Children: []
