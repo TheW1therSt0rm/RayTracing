@@ -275,7 +275,7 @@ MonoBehaviour:
   useShaderInSceneView: 1
   rayTracingShader: {fileID: 4800000, guid: 8fe43b64d47062749920745b84ed9b54, type: 3}
   maxBounces: 30
-  raysPerPixel: 100
+  raysPerPixel: 10
   numPixels: {x: 1280, y: 1080}
   rayTracingMaterial: {fileID: 2100000, guid: b7ed796295128324aabc09eab3fc693b, type: 2}
 --- !u!1 &410087039

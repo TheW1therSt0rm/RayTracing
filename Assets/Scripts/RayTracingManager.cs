@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using UnityEngine;
 
 [ExecuteAlways, ImageEffectAllowedInSceneView]
@@ -18,14 +19,44 @@ public class RayTracingManager : MonoBehaviour
     static readonly int ViewParamsID      = Shader.PropertyToID("viewParams");
     static readonly int CamLocalToWorldID = Shader.PropertyToID("CamLocalToWorldMatrix");
     static readonly int NumSpheresID      = Shader.PropertyToID("NumSpheres");
-    static readonly int SpherePositionsID = Shader.PropertyToID("SpherePositions");
-    static readonly int SphereColsID      = Shader.PropertyToID("SphereCols");
-    static readonly int SphereEmissionsID = Shader.PropertyToID("SphereEmissions");
-    static readonly int SphereEmissionStrengthsID = Shader.PropertyToID("SphereEmissionStrengths");
-    static readonly int SphereRadiusesID  = Shader.PropertyToID("SphereRadiuses");
-    static readonly int MaxBouncesID     = Shader.PropertyToID("MaxBounces");
-    static readonly int RaysPerPixelID   = Shader.PropertyToID("raysPerPixel");
-    static readonly int NumPixelsID   = Shader.PropertyToID("numPixels");
+    static readonly int MaxBouncesID      = Shader.PropertyToID("MaxBounces");
+    static readonly int RaysPerPixelID    = Shader.PropertyToID("raysPerPixel");
+    static readonly int NumPixelsID       = Shader.PropertyToID("numPixels");
+    static readonly int SphereBufferID    = Shader.PropertyToID("_Spheres");
+
+    ComputeBuffer sphereBuffer;
+
+    [StructLayout(LayoutKind.Sequential)]
+    struct SphereData
+    {
+        public Vector3 position;
+        public float radius;
+
+        public Vector3 colour;
+        public float pad0; // keep 16-byte alignment (matches HLSL)
+
+        public Vector3 emission;
+        public float emissionStrength;
+    }
+
+    void OnDisable()
+    {
+        ReleaseBuffers();
+    }
+
+    void OnDestroy()
+    {
+        ReleaseBuffers();
+    }
+
+    void ReleaseBuffers()
+    {
+        if (sphereBuffer != null)
+        {
+            sphereBuffer.Release();
+            sphereBuffer = null;
+        }
+    }
 
     void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
@@ -71,41 +102,53 @@ public class RayTracingManager : MonoBehaviour
 
         Debug.Log($"[RayTracing] Found {count} spheres");
 
-        // Allocate arrays for GPU upload
-        var positions = new Vector4[count];
-        var colours   = new Vector4[count];
-        var emissions = new Vector4[count];
-        var emissionStrengths = new float[count];
-        var radiuses  = new float[count];
+        // Build CPU-side struct array for GPU upload
+        SphereData[] sphereData = count > 0 ? new SphereData[count] : null;
 
         for (int i = 0; i < count; i++)
         {
             SphereObject sp = sphereObjects[i];
-
-            // make sure SphereObject has updated its sphere
             var s = sp.sphere;
 
-            Vector3 pos = s.position;
-            float radius = s.radius;
-            Color col = s.material.colour;
-            Color emission = s.material.emission;
-            float emissionStrength = s.material.emissionStrength;
+            SphereData data = new SphereData();
 
-            positions[i] = new Vector4(pos.x, pos.y, pos.z, 1.0f);
-            colours[i]   = new Vector4(col.r, col.g, col.b, 1.0f);
-            emissions[i] = new Vector4(emission.r, emission.g, emission.b, 1.0f);
-            emissionStrengths[i] = emissionStrength;
-            radiuses[i]  = radius;
+            data.position = s.position;
+            data.radius   = s.radius;
+
+            Color col = s.material.colour;
+            data.colour = new Vector3(col.r, col.g, col.b);
+            data.pad0   = 0f;
+
+            Color emission = s.material.emission;
+            data.emission = new Vector3(emission.r, emission.g, emission.b);
+            data.emissionStrength = s.material.emissionStrength;
+
+            sphereData[i] = data;
+        }
+
+        // Upload to GPU via ComputeBuffer
+        if (count > 0)
+        {
+            int stride = Marshal.SizeOf(typeof(SphereData));
+
+            if (sphereBuffer == null || sphereBuffer.count != count || sphereBuffer.stride != stride)
+            {
+                ReleaseBuffers();
+                sphereBuffer = new ComputeBuffer(count, stride);
+            }
+
+            sphereBuffer.SetData(sphereData);
+            rayTracingMaterial.SetBuffer(SphereBufferID, sphereBuffer);
+        }
+        else
+        {
+            // No spheres – free buffer
+            ReleaseBuffers();
         }
 
         rayTracingMaterial.SetInt(NumSpheresID, count);
-        rayTracingMaterial.SetVectorArray(SpherePositionsID, positions);
-        rayTracingMaterial.SetVectorArray(SphereColsID,      colours);
-        rayTracingMaterial.SetVectorArray(SphereEmissionsID, emissions);
-        rayTracingMaterial.SetFloatArray(SphereEmissionStrengthsID, emissionStrengths);
-        rayTracingMaterial.SetFloatArray(SphereRadiusesID,   radiuses);
         rayTracingMaterial.SetInt(MaxBouncesID, maxBounces);
         rayTracingMaterial.SetInt(RaysPerPixelID, raysPerPixel);
-        rayTracingMaterial.SetVector(NumPixelsID, new(numPixels.x, numPixels.y, 0f, 0f));
+        rayTracingMaterial.SetVector(NumPixelsID, new Vector4(numPixels.x, numPixels.y, 0f, 0f));
     }
 }

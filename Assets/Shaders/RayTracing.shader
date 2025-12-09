@@ -13,7 +13,8 @@ Shader "RayTracing"
         Pass
         {
             CGPROGRAM
-            #pragma target 3.0
+            // Need 4.5+/5.0 for StructuredBuffer
+            #pragma target 5.0
             #pragma vertex vert
             #pragma fragment frag
             #pragma multi_compile_fog
@@ -55,13 +56,6 @@ Shader "RayTracing"
                 RayTracingMaterial material;
             };
 
-            struct Sphere
-            {
-                float3 position;
-                float radius;
-                RayTracingMaterial material;
-            };
-
             struct Tri
             {
                 float3 posA;
@@ -72,6 +66,28 @@ Shader "RayTracing"
                 float3 normalB;
                 float3 normalC;
             };
+
+            // ----------- GPU sphere struct & buffer ------------
+
+            struct SphereGPU
+            {
+                float3 position;
+                float radius;
+
+                float3 colour;
+                float pad0;            // unused, keeps 16-byte alignment
+
+                float3 emission;
+                float emissionStrength;
+            };
+
+            StructuredBuffer<SphereGPU> _Spheres;
+            int    NumSpheres;
+            int    MaxBounces;
+            int    raysPerPixel;
+            float2 numPixels;
+
+            // ---------------------------------------------------
 
             float RaySphereDist(Ray ray, float3 sphereCenter, float sphereRadius)
             {
@@ -90,23 +106,32 @@ Shader "RayTracing"
                 return t;
             }
 
-            HitInfo RaySphere(Ray ray, float3 sphereCenter, float sphereRadius)
+            HitInfo RaySphere(Ray ray, SphereGPU sphere)
             {
                 HitInfo h = (HitInfo)0;
-                float3 oc = ray.origin - sphereCenter;
+
+                float3 oc = ray.origin - sphere.position;
                 float a = dot(ray.dir, ray.dir);
                 float b = 2.0 * dot(oc, ray.dir);
-                float c = dot(oc, oc) - sphereRadius * sphereRadius;
+                float c = dot(oc, oc) - sphere.radius * sphere.radius;
                 float d = b*b - 4.0*a*c;
                 if (d < 0.0) return h;
+
                 float s = sqrt(d);
                 float t = (-b - s) / (2.0 * a);
                 if (t < 0.0) t = (-b + s) / (2.0 * a);
                 if (t < 0.0) return h;
+
                 h.didHit = true;
                 h.dst = t;
                 h.hitPoint = ray.origin + ray.dir * t;
-                h.normal = normalize(h.hitPoint - sphereCenter);
+                h.normal = normalize(h.hitPoint - sphere.position);
+
+                // Fill material from sphere data
+                h.material.colour = sphere.colour;
+                h.material.emission = sphere.emission;
+                h.material.emissionStrength = sphere.emissionStrength;
+
                 return h;
             }
 
@@ -160,32 +185,19 @@ Shader "RayTracing"
                 hit.dst = t;
                 hit.hitPoint = ray.origin + ray.dir * t;
 
-                // Interpolate supplied per-vertex normals
                 float3 n = normalize(tri.normalA * w + tri.normalB * u + tri.normalC * v);
-                // Ensure geometric consistency: flip if needed so normal opposes incoming ray
                 n = dot(n, ray.dir) > 0 ? -n : n;
                 hit.normal = n;
 
-                // Simple material: visualize normal
                 hit.material.colour = float3(1, 1, 1);
                 hit.material.emission = 0;
                 hit.material.emissionStrength = 0;
                 return hit;
             }
 
-            float3 SphereCols[64];
-            float3 SphereEmissions[64];
-            float  SphereEmissionStrengths[64];
-            float3 SpherePositions[64];
-            float  SphereRadiuses[64];
-            int    NumSpheres;
-            int    MaxBounces;
-            int    raysPerPixel;
-            float2 numPixels;
-
             HitInfo CalculateRayCollision(Ray ray)
             {
-                // A small triangle in front of the camera (z=0), high enough to be visible with typical FOV.
+                // Simple test triangle
                 Tri meshP = (Tri)0;
                 meshP.posA = float3(-3, 7, 0);
                 meshP.posB = float3( 3, 7, 0);
@@ -201,14 +213,10 @@ Shader "RayTracing"
                 [loop]
                 for (int i = 0; i < NumSpheres; i++)
                 {
-                    HitInfo h = RaySphere(ray, SpherePositions[i], SphereRadiuses[i]);
+                    SphereGPU s = _Spheres[i];
+                    HitInfo h = RaySphere(ray, s);
                     if (h.didHit && h.dst < closest.dst)
                     {
-                        RayTracingMaterial m;
-                        m.colour = SphereCols[i];
-                        m.emission = SphereEmissions[i];
-                        m.emissionStrength = SphereEmissionStrengths[i];
-                        h.material = m;
                         closest = h;
                     }
                 }
@@ -234,7 +242,7 @@ Shader "RayTracing"
             float RandomValueNormal(inout uint state)
             {
                 float theta = 6.2831853 * RandomValue(state);
-                float rho = sqrt(-2 * log(max(1e-7, RandomValue(state)))); // guard zero
+                float rho = sqrt(-2 * log(max(1e-7, RandomValue(state))));
                 return rho * cos(theta);
             }
 
@@ -283,7 +291,6 @@ Shader "RayTracing"
                     if (h.didHit)
                     {
                         ray.origin = h.hitPoint;
-                        // Cosine-ish diffuse bounce
                         ray.dir = normalize(h.normal + RandomDirection(state));
 
                         float3 emitted = h.material.emission * h.material.emissionStrength;
@@ -301,13 +308,11 @@ Shader "RayTracing"
 
             float4 frag (v2f i) : SV_Target
             {
-                // Camera basis in world space
                 float3 camPos     = mul(CamLocalToWorldMatrix, float4(0,0,0,1)).xyz;
                 float3 camForward = normalize(mul(CamLocalToWorldMatrix, float4(0,0,1,0)).xyz);
                 float3 camRight   = normalize(mul(CamLocalToWorldMatrix, float4(1,0,0,0)).xyz);
                 float3 camUp      = normalize(mul(CamLocalToWorldMatrix, float4(0,1,0,0)).xyz);
 
-                // Stable per-pixel RNG seed
                 uint state = asuint(i.uv.x * 1234.567) ^ asuint(i.uv.y * 3456.789);
 
                 float3 col = 0;
@@ -316,25 +321,18 @@ Shader "RayTracing"
                 [loop]
                 for (int s = 0; s < spp; s++)
                 {
-                    // Subpixel jitter in *UV space*
-                    // RandomPointInCircle gives roughly [-1,1] radius; scale by pixel size
                     float2 jitter = RandomPointInCircle(state) / numPixels;
-
                     float2 uv = i.uv + jitter;
-                    uv = clamp(uv, 0.0, 1.0); // just in case
+                    uv = clamp(uv, 0.0, 1.0);
 
-                    // NDC [-1,1]
                     float2 ndc = uv * 2.0 - 1.0;
 
-                    // Build a ray direction in camera space
-                    // viewParams.x = tan(fov/2)*aspect, viewParams.y = tan(fov/2)
                     float3 dirLocal = normalize(float3(
                         ndc.x * viewParams.x,
                         ndc.y * viewParams.y,
                         1.0
                     ));
 
-                    // Convert to world space using camera basis
                     float3 dirWorld = normalize(
                         dirLocal.x * camRight +
                         dirLocal.y * camUp +
@@ -349,12 +347,10 @@ Shader "RayTracing"
                 }
 
                 col /= spp;
-
-                // Simple clamp / tonemap so it doesn’t blow up visually
-                col = col / (1.0 + col);   // Reinhard-ish
+                col = col / (1.0 + col);   // simple tonemap
                 col = saturate(col);
 
-                return float4(col, 1.0);   // solid alpha
+                return float4(col, 1.0);
             }
             ENDCG
         }
