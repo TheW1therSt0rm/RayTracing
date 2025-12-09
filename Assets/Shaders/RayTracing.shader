@@ -1,3 +1,4 @@
+// Assets/Shaders/RayTracing.shader
 Shader "RayTracing"
 {
     Properties
@@ -13,25 +14,14 @@ Shader "RayTracing"
         {
             CGPROGRAM
             #pragma target 3.0
-
             #pragma vertex vert
             #pragma fragment frag
-            // make fog work
             #pragma multi_compile_fog
 
             #include "UnityCG.cginc"
 
-            struct appdata
-            {
-                float4 vertex : POSITION;
-                float2 uv : TEXCOORD0;
-            };
-
-            struct v2f
-            {
-                float2 uv : TEXCOORD0;
-                float4 vertex : SV_POSITION;
-            };
+            struct appdata { float4 vertex: POSITION; float2 uv: TEXCOORD0; };
+            struct v2f { float2 uv: TEXCOORD0; float4 vertex: SV_POSITION; };
 
             sampler2D _MainTex;
             float4 _MainTex_ST;
@@ -44,13 +34,10 @@ Shader "RayTracing"
                 return o;
             }
 
-            float3 viewParams;
+            float3 viewParams;                // x = tan(fov/2)*aspect, y = tan(fov/2)
             float4x4 CamLocalToWorldMatrix;
 
-            struct Ray {
-                float3 origin;
-                float3 dir;
-            };
+            struct Ray { float3 origin; float3 dir; };
 
             struct RayTracingMaterial
             {
@@ -75,65 +62,115 @@ Shader "RayTracing"
                 RayTracingMaterial material;
             };
 
+            struct Tri
+            {
+                float3 posA;
+                float3 posB;
+                float3 posC;
+                float3 colour;
+                float3 normalA;
+                float3 normalB;
+                float3 normalC;
+            };
+
             float RaySphereDist(Ray ray, float3 sphereCenter, float sphereRadius)
             {
                 float3 oc = ray.origin - sphereCenter;
-
                 float a = dot(ray.dir, ray.dir);
                 float b = 2.0 * dot(oc, ray.dir);
                 float c = dot(oc, oc) - sphereRadius * sphereRadius;
-
-                float discriminant = b * b - 4.0 * a * c;
-
-                if (discriminant < 0.0)
-                    return -1.0;
-
-                float sqrtD = sqrt(discriminant);
-
-                float t0 = (-b - sqrtD) / (2.0 * a);
-                float t1 = (-b + sqrtD) / (2.0 * a);
-
-                // pick the smallest positive t
+                float d = b*b - 4.0*a*c;
+                if (d < 0.0) return -1.0;
+                float s = sqrt(d);
+                float t0 = (-b - s) / (2.0 * a);
+                float t1 = (-b + s) / (2.0 * a);
                 float t = t0;
                 if (t < 0.0) t = t1;
                 if (t < 0.0) return -1.0;
-
                 return t;
             }
 
             HitInfo RaySphere(Ray ray, float3 sphereCenter, float sphereRadius)
             {
-                HitInfo hitInfo = (HitInfo)0;
-
-                float3 offsetRayOrigin = ray.origin - sphereCenter;
-
+                HitInfo h = (HitInfo)0;
+                float3 oc = ray.origin - sphereCenter;
                 float a = dot(ray.dir, ray.dir);
-                float b = 2.0 * dot(offsetRayOrigin, ray.dir);
-                float c = dot(offsetRayOrigin, offsetRayOrigin) - sphereRadius * sphereRadius;
+                float b = 2.0 * dot(oc, ray.dir);
+                float c = dot(oc, oc) - sphereRadius * sphereRadius;
+                float d = b*b - 4.0*a*c;
+                if (d < 0.0) return h;
+                float s = sqrt(d);
+                float t = (-b - s) / (2.0 * a);
+                if (t < 0.0) t = (-b + s) / (2.0 * a);
+                if (t < 0.0) return h;
+                h.didHit = true;
+                h.dst = t;
+                h.hitPoint = ray.origin + ray.dir * t;
+                h.normal = normalize(h.hitPoint - sphereCenter);
+                return h;
+            }
 
-                float discriminant = b * b - 4.0 * a * c;
+            // --- FIXED: robust, double-sided Möller–Trumbore ---
+            HitInfo RayTriangle(Ray ray, Tri tri)
+            {
+                const float EPS = 1e-6;
 
-                if (discriminant < 0.0)
-                    return hitInfo; // didHit stays false
+                float3 edge1 = tri.posB - tri.posA;
+                float3 edge2 = tri.posC - tri.posA;
 
-                float sqrtD = sqrt(discriminant);
+                float3 pvec = cross(ray.dir, edge2);
+                float det = dot(edge1, pvec);
 
-                // closer root
-                float t = (-b - sqrtD) / (2.0 * a);
+                // Double-sided: reject only near-parallel
+                if (abs(det) < EPS)
+                {
+                    HitInfo none = (HitInfo)0;
+                    return none;
+                }
 
-                // if behind camera, try the other root
-                if (t < 0.0)
-                    t = (-b + sqrtD) / (2.0 * a);
+                float invDet = 1.0 / det;
 
-                if (t < 0.0)
-                    return hitInfo;
+                float3 tvec = ray.origin - tri.posA;
+                float u = dot(tvec, pvec) * invDet;
+                if (u < 0.0 || u > 1.0)
+                {
+                    HitInfo none = (HitInfo)0;
+                    return none;
+                }
 
-                hitInfo.didHit   = true;
-                hitInfo.dst      = t;
-                hitInfo.hitPoint = ray.origin + ray.dir * t;
-                hitInfo.normal   = normalize(hitInfo.hitPoint - sphereCenter);
+                float3 qvec = cross(tvec, edge1);
+                float v = dot(ray.dir, qvec) * invDet;
+                if (v < 0.0 || u + v > 1.0)
+                {
+                    HitInfo none = (HitInfo)0;
+                    return none;
+                }
 
-                return hitInfo;
+                float t = dot(edge2, qvec) * invDet;
+                if (t <= 0.0)
+                {
+                    HitInfo none = (HitInfo)0;
+                    return none;
+                }
+
+                float w = 1.0 - u - v;
+
+                HitInfo hit = (HitInfo)0;
+                hit.didHit = true;
+                hit.dst = t;
+                hit.hitPoint = ray.origin + ray.dir * t;
+
+                // Interpolate supplied per-vertex normals
+                float3 n = normalize(tri.normalA * w + tri.normalB * u + tri.normalC * v);
+                // Ensure geometric consistency: flip if needed so normal opposes incoming ray
+                n = dot(n, ray.dir) > 0 ? -n : n;
+                hit.normal = n;
+
+                // Simple material: visualize normal
+                hit.material.colour = float3(1, 1, 1);
+                hit.material.emission = 0;
+                hit.material.emissionStrength = 0;
+                return hit;
             }
 
             float3 SphereCols[64];
@@ -142,51 +179,62 @@ Shader "RayTracing"
             float3 SpherePositions[64];
             float  SphereRadiuses[64];
             int    NumSpheres;
-            int    MaxBounces; // set this from C# with SetInt
-            int    raysPerPixel; // set this from C# with SetInt
+            int    MaxBounces;
+            int    raysPerPixel;
+            float2 numPixels;
 
             HitInfo CalculateRayCollision(Ray ray)
             {
-                HitInfo closestHit = (HitInfo)0;
-                closestHit.didHit = false;
-                closestHit.dst = 1e20;
+                // A small triangle in front of the camera (z=0), high enough to be visible with typical FOV.
+                Tri meshP = (Tri)0;
+                meshP.posA = float3(-3, 7, 0);
+                meshP.posB = float3( 3, 7, 0);
+                meshP.posC = float3( 3, 13, 0);
+                meshP.normalA = normalize(float3(0, -1.0, 0));
+                meshP.normalB = normalize(float3(0, -1.0, 0));
+                meshP.normalC = normalize(float3(0, -1.0, 0));
 
+                HitInfo closest = (HitInfo)0;
+                closest.dst = 1e20;
+
+                // Spheres
+                [loop]
                 for (int i = 0; i < NumSpheres; i++)
                 {
-                    float3 pos    = SpherePositions[i];
-                    float  radius = SphereRadiuses[i];
-
-                    HitInfo hitInfo = RaySphere(ray, pos, radius);
-
-                    if (hitInfo.didHit && hitInfo.dst < closestHit.dst)
+                    HitInfo h = RaySphere(ray, SpherePositions[i], SphereRadiuses[i]);
+                    if (h.didHit && h.dst < closest.dst)
                     {
-                        closestHit = hitInfo;
-
-                        // Fill material from the arrays you upload from C#
-                        RayTracingMaterial mat;
-                        mat.colour            = SphereCols[i];
-                        mat.emission          = SphereEmissions[i];
-                        mat.emissionStrength  = SphereEmissionStrengths[i];
-
-                        closestHit.material = mat;
+                        RayTracingMaterial m;
+                        m.colour = SphereCols[i];
+                        m.emission = SphereEmissions[i];
+                        m.emissionStrength = SphereEmissionStrengths[i];
+                        h.material = m;
+                        closest = h;
                     }
                 }
 
-                return closestHit;
+                // Triangle
+                HitInfo triHit = RayTriangle(ray, meshP);
+                if (triHit.didHit && triHit.dst < closest.dst)
+                {
+                    closest = triHit;
+                }
+
+                return closest;
             }
 
             float RandomValue(inout uint state)
             {
-                state = state * 747796405 + 2891336453;
-                uint result = ((state >> ((state >> 28) + 4)) ^ state) * 277803737;
+                state = state * 747796405u + 2891336453u;
+                uint result = ((state >> ((state >> 28) + 4)) ^ state) * 277803737u;
                 result = (result >> 22) ^ result;
                 return result / 4294967295.0;
             }
-            
+
             float RandomValueNormal(inout uint state)
             {
-                float theta = 2 * 3.14159265 * RandomValue(state);
-                float rho = sqrt(-2 * log(RandomValue(state)));
+                float theta = 6.2831853 * RandomValue(state);
+                float rho = sqrt(-2 * log(max(1e-7, RandomValue(state)))); // guard zero
                 return rho * cos(theta);
             }
 
@@ -200,85 +248,113 @@ Shader "RayTracing"
 
             float3 RandomHemisphereDirection(float3 normal, inout uint state)
             {
-                float3 dir = RandomDirection(state);
-                return dir * sign(dot(normal, dir));
+                float3 d = RandomDirection(state);
+                return d * sign(dot(normal, d));
+            }
+            
+            static const float PI = 3.1415;
+
+            float2 RandomPointInCircle(inout uint state)
+            {
+                float angle = RandomValue(state) * 2 * PI;
+                float2 pointOnCircle = float2(cos(angle), sin(angle));
+                return pointOnCircle * sqrt(RandomValue(state));
             }
 
             float3 GetEnvironmentColour(Ray ray)
             {
-                float skyGradientT = pow(smoothstep(0, 0.4, ray.dir.y), 0.35);
-                float3 skyGradient = lerp(float3(0.6, 0.8, 1.0), float3(0.1, 0.2, 0.4), skyGradientT);
-                float sun = pow(max(0, dot(ray.dir, -normalize(float3(1, 1, 0)))), 200) * 3;
-
-                float groundToSkyT = smoothstep(-0.1, 0, ray.dir.y);
-                float sunMask = groundToSkyT >= 1;
-                return lerp(float3(0.2, 0.1, 0.8), skyGradient, groundToSkyT) + sun * sunMask;
+                float t = pow(smoothstep(0, 0.4, ray.dir.y), 0.35);
+                float3 sky = lerp(float3(0.6,0.8,1.0), float3(0.1,0.2,0.4), t);
+                float sun = pow(max(0, dot(ray.dir, -normalize(float3(1,1,0)))), 200) * 3;
+                float a = smoothstep(-0.1, 0, ray.dir.y);
+                float sunMask = a >= 1;
+                return lerp(float3(0.2,0.1,0.8), sky, a) + sun * sunMask;
             }
 
             float3 Trace(Ray ray, inout uint state)
             {
-                float3 incomingLight = 0;
-                float3 rayColour = 1;
+                float3 incoming = 0;
+                float3 throughput = 1;
 
+                [loop]
                 for (int i = 0; i < MaxBounces + 1; i++)
                 {
-                    HitInfo hitInfo = CalculateRayCollision(ray);
-                    if (hitInfo.didHit)
+                    HitInfo h = CalculateRayCollision(ray);
+                    if (h.didHit)
                     {
-                        ray.origin = hitInfo.hitPoint;
-                        ray.dir = RandomHemisphereDirection(hitInfo.normal, state);
+                        ray.origin = h.hitPoint;
+                        // Cosine-ish diffuse bounce
+                        ray.dir = normalize(h.normal + RandomDirection(state));
 
-                        RayTracingMaterial material = hitInfo.material;
-                        float3 emittedLight = material.emission * material.emissionStrength;
-                        incomingLight += emittedLight * rayColour;
-                        rayColour *= material.colour;
+                        float3 emitted = h.material.emission * h.material.emissionStrength;
+                        incoming += emitted * throughput;
+                        throughput *= h.material.colour;
                     }
                     else
                     {
-                        incomingLight += GetEnvironmentColour(ray) * rayColour;
+                        incoming += GetEnvironmentColour(ray) * throughput;
                         break;
                     }
                 }
-
-                return incomingLight;
+                return incoming;
             }
 
             float4 frag (v2f i) : SV_Target
             {
-                // Camera position & basis from matrix
-                float3 camPos     = mul(CamLocalToWorldMatrix, float4(0, 0, 0, 1)).xyz;
-                float3 camForward = normalize(mul(CamLocalToWorldMatrix, float4(0, 0, 1, 0)).xyz);
-                float3 camRight   = normalize(mul(CamLocalToWorldMatrix, float4(1, 0, 0, 0)).xyz);
-                float3 camUp      = normalize(mul(CamLocalToWorldMatrix, float4(0, 1, 0, 0)).xyz);
+                // Camera basis in world space
+                float3 camPos     = mul(CamLocalToWorldMatrix, float4(0,0,0,1)).xyz;
+                float3 camForward = normalize(mul(CamLocalToWorldMatrix, float4(0,0,1,0)).xyz);
+                float3 camRight   = normalize(mul(CamLocalToWorldMatrix, float4(1,0,0,0)).xyz);
+                float3 camUp      = normalize(mul(CamLocalToWorldMatrix, float4(0,1,0,0)).xyz);
 
-                // NDC coordinates in [-1, 1]
-                float2 ndc = i.uv * 2.0 - 1.0;
-
-                // viewParams.x = tan(fov/2)*aspect
-                // viewParams.y = tan(fov/2)
-                float3 dirCamera = normalize(float3(ndc.x * viewParams.x, ndc.y * viewParams.y, 1.0));
-
-                // Transform camera-space ray direction into world space
-                float3 dirWorld =
-                    dirCamera.x * camRight +
-                    dirCamera.y * camUp +
-                    dirCamera.z * camForward;
-                dirWorld = normalize(dirWorld);
-
-                // Seed for RNG (slightly less cursed)
+                // Stable per-pixel RNG seed
                 uint state = asuint(i.uv.x * 1234.567) ^ asuint(i.uv.y * 3456.789);
-                
-                Ray ray;
-                ray.origin = camPos;
-                ray.dir    = dirWorld;
 
                 float3 col = 0;
-                for (int i = 0; i < raysPerPixel; i++)
+                int spp = max(1, raysPerPixel);
+
+                [loop]
+                for (int s = 0; s < spp; s++)
                 {
+                    // Subpixel jitter in *UV space*
+                    // RandomPointInCircle gives roughly [-1,1] radius; scale by pixel size
+                    float2 jitter = RandomPointInCircle(state) / numPixels;
+
+                    float2 uv = i.uv + jitter;
+                    uv = clamp(uv, 0.0, 1.0); // just in case
+
+                    // NDC [-1,1]
+                    float2 ndc = uv * 2.0 - 1.0;
+
+                    // Build a ray direction in camera space
+                    // viewParams.x = tan(fov/2)*aspect, viewParams.y = tan(fov/2)
+                    float3 dirLocal = normalize(float3(
+                        ndc.x * viewParams.x,
+                        ndc.y * viewParams.y,
+                        1.0
+                    ));
+
+                    // Convert to world space using camera basis
+                    float3 dirWorld = normalize(
+                        dirLocal.x * camRight +
+                        dirLocal.y * camUp +
+                        dirLocal.z * camForward
+                    );
+
+                    Ray ray;
+                    ray.origin = camPos;
+                    ray.dir    = dirWorld;
+
                     col += Trace(ray, state);
                 }
-                col /= raysPerPixel;
-                return float4(col, 0.0);
+
+                col /= spp;
+
+                // Simple clamp / tonemap so it doesn’t blow up visually
+                col = col / (1.0 + col);   // Reinhard-ish
+                col = saturate(col);
+
+                return float4(col, 1.0);   // solid alpha
             }
             ENDCG
         }

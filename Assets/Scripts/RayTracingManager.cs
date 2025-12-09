@@ -10,10 +10,9 @@ public class RayTracingManager : MonoBehaviour
 
     [SerializeField] bool useShaderInSceneView = true;
     [SerializeField] Shader rayTracingShader;
-    [SerializeField, Range(1, 30)]
-    int maxBounces = 5;
-    [SerializeField, Range(1, 200)]
-    int raysPerPixel = 3;
+    [SerializeField] int maxBounces = 30;
+    [SerializeField] int raysPerPixel = 100;
+    [SerializeField] Vector2 numPixels = new(1280f, 1080f);
     public Material rayTracingMaterial;
 
     static readonly int ViewParamsID      = Shader.PropertyToID("viewParams");
@@ -26,6 +25,7 @@ public class RayTracingManager : MonoBehaviour
     static readonly int SphereRadiusesID  = Shader.PropertyToID("SphereRadiuses");
     static readonly int MaxBouncesID     = Shader.PropertyToID("MaxBounces");
     static readonly int RaysPerPixelID   = Shader.PropertyToID("raysPerPixel");
+    static readonly int NumPixelsID   = Shader.PropertyToID("numPixels");
 
     void OnRenderImage(RenderTexture source, RenderTexture destination)
     {
@@ -106,5 +106,6 @@ public class RayTracingManager : MonoBehaviour
         rayTracingMaterial.SetFloatArray(SphereRadiusesID,   radiuses);
         rayTracingMaterial.SetInt(MaxBouncesID, maxBounces);
         rayTracingMaterial.SetInt(RaysPerPixelID, raysPerPixel);
+        rayTracingMaterial.SetVector(NumPixelsID, new(numPixels.x, numPixels.y, 0f, 0f));
     }
 }
