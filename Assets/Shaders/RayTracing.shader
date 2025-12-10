@@ -69,20 +69,46 @@ Shader "RayTracing"
 
             // ----------- GPU sphere struct & buffer ------------
 
+            // Must match SphereData layout in C#
             struct SphereGPU
             {
                 float3 position;
-                float radius;
+                float  radius;
 
                 float3 colour;
-                float pad0;            // unused, keeps 16-byte alignment
+                float  pad0;
 
                 float3 emission;
-                float emissionStrength;
+                float  emissionStrength;
             };
 
             StructuredBuffer<SphereGPU> _Spheres;
-            int    NumSpheres;
+            int NumSpheres;
+
+            // ---- Triangles ----
+            struct TriangleData
+            {
+                float3 v0;
+                float  pad0;
+
+                float3 v1;
+                float  pad1;
+
+                float3 v2;
+                float  pad2;
+
+                float3 normal;
+                float  pad3;
+
+                float3 colour;
+                float  pad4;
+
+                float3 emission;
+                float  emissionStrength;
+            };
+
+            StructuredBuffer<TriangleData> _Triangles;
+            int NumTriangles;
             int    MaxBounces;
             int    raysPerPixel;
             float2 numPixels;
@@ -135,77 +161,52 @@ Shader "RayTracing"
                 return h;
             }
 
-            // --- FIXED: robust, double-sided Möller–Trumbore ---
-            HitInfo RayTriangle(Ray ray, Tri tri)
+            // -------- FIXED TRIANGLE INTERSECTION --------
+            HitInfo RayTriangle(Ray ray, TriangleData tri)
             {
-                const float EPS = 1e-6;
+                HitInfo h = (HitInfo)0;
 
-                float3 edge1 = tri.posB - tri.posA;
-                float3 edge2 = tri.posC - tri.posA;
+                float3 edgeAB = tri.v1 - tri.v0;
+                float3 edgeAC = tri.v2 - tri.v0;
+                float3 normalVector = cross(edgeAB, edgeAC);
 
-                float3 pvec = cross(ray.dir, edge2);
-                float det = dot(edge1, pvec);
+                float determinant = -dot(ray.dir, normalVector);
 
-                // Double-sided: reject only near-parallel
-                if (abs(det) < EPS)
-                {
-                    HitInfo none = (HitInfo)0;
-                    return none;
-                }
+                // Ray parallel or back-facing: no hit
+                if (determinant < 1e-6)
+                    return h;
 
-                float invDet = 1.0 / det;
+                float invDet = 1.0 / determinant;
 
-                float3 tvec = ray.origin - tri.posA;
-                float u = dot(tvec, pvec) * invDet;
-                if (u < 0.0 || u > 1.0)
-                {
-                    HitInfo none = (HitInfo)0;
-                    return none;
-                }
+                float3 ao  = ray.origin - tri.v0;
+                float3 dao = cross(ao, ray.dir);
 
-                float3 qvec = cross(tvec, edge1);
-                float v = dot(ray.dir, qvec) * invDet;
-                if (v < 0.0 || u + v > 1.0)
-                {
-                    HitInfo none = (HitInfo)0;
-                    return none;
-                }
+                float dst = dot(ao, normalVector) * invDet;
+                float u   = dot(edgeAC, dao) * invDet;
+                float v   = -dot(edgeAB, dao) * invDet;
+                float w   = 1.0 - u - v;
 
-                float t = dot(edge2, qvec) * invDet;
-                if (t <= 0.0)
-                {
-                    HitInfo none = (HitInfo)0;
-                    return none;
-                }
+                // Outside triangle or behind ray origin
+                if (dst < 0.0 || u < 0.0 || v < 0.0 || w < 0.0)
+                    return h;
 
-                float w = 1.0 - u - v;
+                h.didHit  = true;
+                h.dst     = dst;
+                h.hitPoint = ray.origin + ray.dir * dst;
 
-                HitInfo hit = (HitInfo)0;
-                hit.didHit = true;
-                hit.dst = t;
-                hit.hitPoint = ray.origin + ray.dir * t;
+                // Use provided triangle normal (already averaged in C#)
+                h.normal = normalize(tri.normal);
 
-                float3 n = normalize(tri.normalA * w + tri.normalB * u + tri.normalC * v);
-                n = dot(n, ray.dir) > 0 ? -n : n;
-                hit.normal = n;
+                // Material from triangle data
+                h.material.colour            = tri.colour;
+                h.material.emission          = tri.emission;
+                h.material.emissionStrength  = tri.emissionStrength;
 
-                hit.material.colour = float3(1, 1, 1);
-                hit.material.emission = 0;
-                hit.material.emissionStrength = 0;
-                return hit;
+                return h;
             }
 
             HitInfo CalculateRayCollision(Ray ray)
             {
-                // Simple test triangle
-                Tri meshP = (Tri)0;
-                meshP.posA = float3(-3, 7, 0);
-                meshP.posB = float3( 3, 7, 0);
-                meshP.posC = float3( 3, 13, 0);
-                meshP.normalA = normalize(float3(0, -1.0, 0));
-                meshP.normalB = normalize(float3(0, -1.0, 0));
-                meshP.normalC = normalize(float3(0, -1.0, 0));
-
                 HitInfo closest = (HitInfo)0;
                 closest.dst = 1e20;
 
@@ -221,11 +222,16 @@ Shader "RayTracing"
                     }
                 }
 
-                // Triangle
-                HitInfo triHit = RayTriangle(ray, meshP);
-                if (triHit.didHit && triHit.dst < closest.dst)
+                // Triangles
+                [loop]
+                for (int i = 0; i < NumTriangles; i++)
                 {
-                    closest = triHit;
+                    TriangleData tri = _Triangles[i];
+                    HitInfo h = RayTriangle(ray, tri);
+                    if (h.didHit && h.dst < closest.dst)
+                    {
+                        closest = h;
+                    }
                 }
 
                 return closest;
@@ -281,28 +287,67 @@ Shader "RayTracing"
 
             float3 Trace(Ray ray, inout uint state)
             {
-                float3 incoming = 0;
+                float3 incoming   = 0;
                 float3 throughput = 1;
 
+                // Safety clamp on the shader side too
+                int maxB;
+                if (MaxBounces < 1)
+                {
+                    maxB = 1;
+                }
+                else
+                {
+                    maxB = MaxBounces;
+                }
+
                 [loop]
-                for (int i = 0; i < MaxBounces + 1; i++)
+                for (int bounce = 0; bounce < maxB; bounce++)
                 {
                     HitInfo h = CalculateRayCollision(ray);
-                    if (h.didHit)
-                    {
-                        ray.origin = h.hitPoint;
-                        ray.dir = normalize(h.normal + RandomDirection(state));
 
-                        float3 emitted = h.material.emission * h.material.emissionStrength;
-                        incoming += emitted * throughput;
-                        throughput *= h.material.colour;
-                    }
-                    else
+                    if (!h.didHit)
                     {
+                        // Hit sky
                         incoming += GetEnvironmentColour(ray) * throughput;
                         break;
                     }
+
+                    // Move origin slightly along the normal to avoid self-intersection
+                    ray.origin = h.hitPoint + h.normal * 1e-3;
+                    // Cosine-ish diffuse bounce
+                    ray.dir    = normalize(h.normal + RandomDirection(state));
+
+                    // Add emission
+                    float3 emitted = h.material.emission * h.material.emissionStrength;
+                    incoming += emitted * throughput;
+
+                    // Multiply by surface albedo
+                    throughput *= h.material.colour;
+
+                    // Early out if contribution is tiny
+                    float maxChannel = max(throughput.x, max(throughput.y, throughput.z));
+                    if (maxChannel < 0.001)
+                        break;
+
+                    // -------------------------
+                    // Russian roulette
+                    // -------------------------
+                    if (bounce >= 3)  // only after a few bounces
+                    {
+                        float p = saturate(maxChannel);  // survival probability
+                        float r = RandomValue(state);
+                        if (r > p)
+                        {
+                            // Path dies
+                            break;
+                        }
+
+                        // If it survives, compensate
+                        throughput /= p;
+                    }
                 }
+
                 return incoming;
             }
 
