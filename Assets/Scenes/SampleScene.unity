@@ -330,13 +330,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1, z: -20}
+  m_LocalRotation: {x: -0.28692546, y: -0, z: -0, w: 0.9579529}
+  m_LocalPosition: {x: 0, y: 1, z: -5.261}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: -33.348, y: 0, z: 0}
 --- !u!114 &330585547
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -396,7 +396,7 @@ MonoBehaviour:
   useShaderInSceneView: 1
   rayTracingShader: {fileID: 4800000, guid: 8fe43b64d47062749920745b84ed9b54, type: 3}
   maxBounces: 3
-  raysPerPixel: 5
+  raysPerPixel: 15
   numPixels: {x: 1280, y: 1080}
   rayTracingMaterial: {fileID: 2100000, guid: b7ed796295128324aabc09eab3fc693b, type: 2}
 --- !u!1 &447583634
@@ -636,7 +636,7 @@ Transform:
   m_GameObject: {fileID: 1230569181}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 1, z: 0, w: 0}
-  m_LocalPosition: {x: 0, y: 0, z: -5.01}
+  m_LocalPosition: {x: 0, y: 0, z: -5}
   m_LocalScale: {x: 10, y: 10, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -796,7 +796,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   colour: {r: 0, g: 0, b: 0, a: 1}
-  emission: {r: 1, g: 1, b: 1, a: 1}
+  emission: {r: 0.092, g: 1, b: 0.248, a: 1}
   emissionStrength: 50
 --- !u!65 &1433342339
 BoxCollider:
